@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="LabPortal.API/LabPortal.API.csproj" />
+  <Project Path="LabPortal.Client/LabPortal.Client.csproj" Id="908742c6-b70e-455b-87fa-e6b863313ba8" />
+</Solution>

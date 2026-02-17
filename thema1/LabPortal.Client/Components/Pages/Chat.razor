@@ -1,0 +1,341 @@
+﻿@page "/chat"
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.AspNetCore.Authorization
+@using Blazored.LocalStorage
+@using LabPortal.Client.Models
+@attribute [Authorize]
+@inject NavigationManager Navigation
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+@implements IAsyncDisposable
+
+<div class="container-fluid h-100" style="min-height: 85vh;">
+    <div class="row h-100 shadow rounded overflow-hidden border">
+
+        <div class="col-md-3 bg-light border-end p-0 d-flex flex-column">
+            <div class="p-3 bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Ομάδες</h5>
+                <button class="btn btn-sm btn-light text-primary fw-bold" @onclick="() => showCreateGroupModal = true" title="Νέα Ομάδα">
+                    +
+                </button>
+            </div>
+
+            <div class="list-group list-group-flush flex-grow-1 overflow-auto">
+                @foreach (var g in myGroups)
+                {
+                    <button class="list-group-item list-group-item-action @(activeGroupId == g.Id ? "active" : "")"
+                            @onclick="() => SelectGroup(g.Id, g.Name)">
+                        <span class="me-2">👥</span> @g.Name
+                    </button>
+                }
+            </div>
+
+            <div class="p-2 border-top bg-white small text-center">
+                Status: @(IsConnected ? "🟢 Online" : "🔴 Offline")
+            </div>
+        </div>
+
+        <div class="col-md-9 p-0 d-flex flex-column bg-white">
+            <div class="p-3 border-bottom bg-white shadow-sm">
+                <h5 class="mb-0"># @activeGroupName</h5>
+            </div>
+
+            <div class="flex-grow-1 p-3 overflow-auto" style="background-color: #f8f9fa; display: flex; flex-direction: column-reverse;">
+                @if (messages.Any())
+                {
+                    @foreach (var msg in ((IEnumerable<ChatMessage>)messages).Reverse())
+                    {
+                        <div class="mb-2">
+                            <strong>@msg.User:</strong> @msg.Message
+                            <div class="text-muted" style="font-size: 0.7em;">@msg.SentAt.ToLocalTime().ToString("HH:mm")</div>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="text-center text-muted mt-5">Δεν υπάρχουν μηνύματα ακόμα. Γράψε κάτι!</div>
+                }
+            </div>
+
+            <div class="p-3 border-top bg-light">
+                <div class="input-group">
+                    <input @bind="messageInput" @bind:event="oninput" @onkeydown="HandleEnter"
+                           class="form-control" placeholder="Γράψε μήνυμα..." disabled="@(!IsConnected)" />
+                    <button class="btn btn-primary" @onclick="Send" disabled="@(!IsConnected || string.IsNullOrWhiteSpace(messageInput))">
+                        Αποστολή
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (showCreateGroupModal)
+{
+    <div class="modal fade show d-block" style="background: rgba(0,0,0,0.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Νέα Ομάδα</h5>
+                    <button type="button" class="btn-close" @onclick="() => showCreateGroupModal = false"></button>
+                </div>
+                <div class="modal-body">
+                    <input class="form-control mb-3" @bind="newGroupName" placeholder="Όνομα Ομάδας" />
+                    <label>Επιλογή Μελών:</label>
+                    <div class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
+                        @foreach (var u in allUsers)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" @onchange="(e) => ToggleUser(u.Email, e.Value)">
+                                <label class="form-check-label">@u.FirstName @u.LastName (@u.Email)</label>
+                            </div>
+                        }
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" @onclick="CreateGroup">Δημιουργία</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private HubConnection? hubConnection;
+    private List<ChatMessage> messages = new();
+    private List<GroupDto> myGroups = new();
+    private List<UserDto> allUsers = new();
+
+    private string? messageInput;
+    private bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+
+    private int activeGroupId = 0;
+    private string activeGroupName = "Φόρτωση...";
+
+    private bool showCreateGroupModal = false;
+    private string newGroupName = "";
+    private List<string> selectedEmails = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+
+        var token = await LocalStorage.GetItemAsync<string>("authToken");
+        if (string.IsNullOrEmpty(token)) return;
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl("https://localhost:7177/portalHub", opt => opt.AccessTokenProvider = () => Task.FromResult(token))
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<int, string, string>("ReceiveGroupMessage", (groupId, user, msg) =>
+        {
+            if (groupId == activeGroupId)
+            {
+                messages.Add(new ChatMessage { User = user, Message = msg, SentAt = DateTime.UtcNow });
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        hubConnection.On<int, string>("GroupCreated", (id, name) =>
+        {
+            myGroups.Add(new GroupDto { Id = id, Name = name });
+            InvokeAsync(StateHasChanged);
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task LoadData()
+    {
+        try
+        {
+            myGroups = await Http.GetFromJsonAsync<List<GroupDto>>("api/groups") ?? new();
+
+            var general = myGroups.FirstOrDefault(g => g.Name == "General Lab") ?? myGroups.FirstOrDefault();
+            if (general != null)
+            {
+                await SelectGroup(general.Id, general.Name);
+            }
+
+            allUsers = await Http.GetFromJsonAsync<List<UserDto>>("api/users") ?? new();
+        }
+        catch (Exception ex) { Console.WriteLine("Load Error: " + ex.Message); }
+    }
+
+    private async Task SelectGroup(int id, string name)
+    {
+        activeGroupId = id;
+        activeGroupName = name;
+        messages.Clear();
+
+        try
+        {
+            var history = await Http.GetFromJsonAsync<List<ChatMessage>>($"api/groups/{id}/messages");
+            if (history != null) messages.AddRange(history);
+        }
+        catch { }
+    }
+
+    private async Task Send()
+    {
+        if (IsConnected && !string.IsNullOrWhiteSpace(messageInput) && activeGroupId != 0)
+        {
+            await hubConnection.SendAsync("SendMessageToGroup", activeGroupId, messageInput);
+            messageInput = "";
+        }
+    }
+
+    private async Task CreateGroup()
+    {
+        if (!string.IsNullOrWhiteSpace(newGroupName))
+        {
+            await hubConnection.SendAsync("CreateGroup", newGroupName, selectedEmails);
+            showCreateGroupModal = false;
+            newGroupName = "";
+            selectedEmails.Clear();
+        }
+    }
+
+    private void ToggleUser(string email, object? isChecked)
+    {
+        if (isChecked is bool checkedVal && checkedVal) selectedEmails.Add(email);
+        else selectedEmails.Remove(email);
+    }
+
+    private async Task HandleEnter(KeyboardEventArgs e) { if (e.Key == "Enter") await Send(); }
+
+    public async ValueTask DisposeAsync() { if (hubConnection != null) await hubConnection.DisposeAsync(); }
+
+    public class ChatMessage { public string User { get; set; } = ""; public string Message { get; set; } = ""; public DateTime SentAt { get; set; } }
+    public class GroupDto { public int Id { get; set; } public string Name { get; set; } = ""; }
+}
+
+<style>
+    .chat-layout {
+        height: calc(100vh - 60px);
+        background-color: #fff;
+        border-radius: 15px;
+        overflow: hidden;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+
+    .chat-sidebar {
+        background-color: #f8f9fa;
+        border-right: 1px solid #dee2e6;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .group-btn {
+        border: none;
+        border-radius: 10px !important;
+        margin-bottom: 5px;
+        text-align: left;
+        padding: 10px 15px;
+        color: #495057;
+        background: transparent;
+        transition: all 0.2s;
+    }
+
+        .group-btn:hover {
+            background-color: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .group-btn.active {
+            background-color: #0d6efd !important;
+            color: white !important;
+            font-weight: 600;
+            box-shadow: 0 4px 6px rgba(13, 110, 253, 0.2);
+        }
+
+    .chat-main {
+        display: flex;
+        flex-direction: column;
+        background-color: white;
+    }
+
+    .messages-container {
+        flex-grow: 1;
+        padding: 20px;
+        background-color: #f2f4f7;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column-reverse;
+        gap: 10px;
+    }
+
+    .msg-card {
+        max-width: 80%;
+        padding: 12px 16px;
+        position: relative;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        display: flex;
+        flex-direction: column;
+        word-wrap: break-word;
+    }
+
+    .msg-received {
+        align-self: flex-start;
+        background-color: white;
+        border-radius: 0px 15px 15px 15px;
+        border-left: 4px solid #0d6efd;
+    }
+
+    .msg-sent {
+        align-self: flex-end;
+        background-color: #0d6efd;
+        color: white;
+        border-radius: 15px 0px 15px 15px;
+    }
+
+    .msg-user {
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin-bottom: 2px;
+        color: #0d6efd;
+    }
+
+    .msg-time {
+        font-size: 0.7rem;
+        text-align: right;
+        margin-top: 5px;
+        opacity: 0.7;
+    }
+
+    .msg-sent .msg-time {
+        color: #e0e0e0;
+    }
+
+    .input-area {
+        padding: 15px;
+        background-color: white;
+        border-top: 1px solid #dee2e6;
+    }
+
+    .modern-input {
+        border-radius: 25px !important;
+        padding: 10px 20px;
+        background-color: #f8f9fa;
+        border: 1px solid #ced4da;
+    }
+
+        .modern-input:focus {
+            background-color: white;
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+            border-color: #0d6efd;
+        }
+
+    .send-btn {
+        border-radius: 50% !important;
+        width: 45px;
+        height: 45px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: 10px;
+        padding: 0;
+    }
+</style>

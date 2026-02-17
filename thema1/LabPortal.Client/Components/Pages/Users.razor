@@ -1,0 +1,117 @@
+﻿@page "/users"
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.SignalR.Client
+@using LabPortal.Client.Models
+@using LabPortal.Client.Components
+@using Blazored.LocalStorage
+@attribute [Authorize]
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+
+<div class="container mt-4">
+    <h3>Χρήστες</h3>
+    <p>Επίλεξε έναν χρήστη για να ξεκινήσεις προσωπική συνομιλία.</p>
+
+    @if (users == null)
+    {
+        <div class="spinner-border text-primary"></div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var user in users)
+            {
+                <div class="col-md-4 mb-3">
+                    <div class="card shadow-sm">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">@user.UserName</h5>
+                            <p class="text-muted">@user.FirstName @user.LastName</p>
+
+                            <button class="btn btn-primary w-100" @onclick="() => OpenChat(user)">
+                                Μήνυμα
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <ChatPopup @ref="chatPopup"
+               TargetUser="selectedUser"
+               HubConnection="hubConnection"
+               OnClose="() => selectedUser = null" />
+</div>
+
+@code {
+    private List<UserDto>? users;
+    private UserDto? selectedUser;
+    private HubConnection? hubConnection;
+
+    private ChatPopup? chatPopup;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            users = await Http.GetFromJsonAsync<List<UserDto>>("api/friendships/myfriends");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("Error loading friends: " + ex.Message);
+        }
+
+        await StartSignalR();
+    }
+
+    private async Task StartSignalR()
+    {
+        var token = await LocalStorage.GetItemAsync<string>("authToken");
+        var apiUrl = "https://localhost:7177/portalHub";
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(apiUrl, options =>
+            {
+                options.AccessTokenProvider = () => Task.FromResult(token);
+            })
+            .WithAutomaticReconnect()
+            .Build();
+
+        hubConnection.On<string, string>("ReceivePrivateMessage", async (senderName, message) =>
+        {
+            await InvokeAsync(() =>
+            {
+                var senderUser = users?.FirstOrDefault(u => u.UserName == senderName);
+                if (senderUser == null) return;
+
+                if (selectedUser != null && selectedUser.UserName == senderName)
+                {
+                    chatPopup?.ReceiveMessage(message);
+                }
+                else
+                {
+                    Console.WriteLine($"[Notification] Νέο μήνυμα από {senderName}");
+                }
+
+                StateHasChanged();
+            });
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private void OpenChat(UserDto user)
+    {
+        selectedUser = user;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

@@ -1,0 +1,155 @@
+﻿@page "/login"
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@using LabPortal.Client.Providers
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.Text.Json.Serialization
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Login - LabPortal</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card shadow-lg border-0 rounded-3">
+                <div class="card-header bg-primary text-white text-center py-3">
+                    <h3 class="mb-0 fw-bold">Σύνδεση</h3>
+                </div>
+                <div class="card-body p-4">
+
+                    <EditForm Model="loginModel" OnValidSubmit="HandleLogin">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <InputText @bind-Value="loginModel.Email" class="form-control" placeholder="user@example.com" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <InputText @bind-Value="loginModel.Password" type="password" class="form-control" />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 btn-lg mb-3">Σύνδεση</button>
+                    </EditForm>
+
+                    <div class="d-flex align-items-center mb-3">
+                        <hr class="flex-grow-1">
+                        <span class="px-2 text-muted small">ή</span>
+                        <hr class="flex-grow-1">
+                    </div>
+
+                    <div class="text-center mb-3">
+                        <div id="google-btn"></div>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(errorMessage))
+                    {
+                        <div class="alert alert-danger text-center">@errorMessage</div>
+                    }
+
+                    <div class="text-center mt-3">
+                        <small>Δεν έχεις λογαριασμό; <a href="register" class="text-decoration-none">Εγγραφή εδώ</a></small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginDto loginModel = new();
+    private string errorMessage = "";
+    private DotNetObjectReference<Login>? objRef;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                objRef = DotNetObjectReference.Create(this);
+                await JS.InvokeVoidAsync("initializeGoogleSignIn", "556583745456-5f8tch4j4329g11qvqce67srbiklvi2v.apps.googleusercontent.com", objRef);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Google Init Error: " + ex.Message);
+            }
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/account/login", loginModel);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+                if (result != null)
+                {
+                    await ((CustomAuthStateProvider)AuthStateProvider).MarkUserAsAuthenticated(result.AccessToken);
+                    Navigation.NavigateTo("/");
+                }
+            }
+            else
+            {
+                errorMessage = "Λάθος email ή κωδικός πρόσβασης.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Σφάλμα σύνδεσης: " + ex.Message;
+        }
+    }
+
+    [JSInvokable]
+    public async Task HandleGoogleLogin(string googleToken)
+    {
+        try
+        {
+            var response = await Http.PostAsJsonAsync("api/account/google-login", new { IdToken = googleToken });
+
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<LoginResponse>();
+                if (result != null && !string.IsNullOrEmpty(result.AccessToken))
+                {
+                    await ((CustomAuthStateProvider)AuthStateProvider).MarkUserAsAuthenticated(result.AccessToken);
+                    Navigation.NavigateTo("/");
+                }
+            }
+            else
+            {
+                var errorMsg = await response.Content.ReadAsStringAsync();
+                errorMessage = "Η σύνδεση με Google απέτυχε.";
+                Console.WriteLine("API Error: " + errorMsg);
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Σφάλμα: " + ex.Message;
+            Console.WriteLine("Client Error: " + ex.Message);
+        }
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        objRef?.Dispose();
+    }
+
+    public class LoginDto
+    {
+        public string Email { get; set; } = "";
+        public string Password { get; set; } = "";
+    }
+
+    public class LoginResponse
+    {
+        [JsonPropertyName("accessToken")]
+        public string AccessToken { get; set; } = "";
+    }
+}

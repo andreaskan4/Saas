@@ -1,0 +1,49 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using LabPortal.Client.Providers
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@using LabPortal.Client.Components
+@using LabPortal.Client.Components.Pages
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <div class="me-3">
+                        <NotificationBell />
+                    </div>
+
+                    <span class="me-3">
+                        Γεια σου, <b>@(context.User.Identity?.Name ?? context.User.FindFirst("email")?.Value ?? "Χρήστη")</b>!
+                    </span>
+                    
+                    <button class="btn btn-sm btn-outline-danger" @onclick="Logout">Logout</button>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="login">Login</a>
+                    <a href="register" class="ms-3">Register</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private async Task Logout()
+    {
+        var customAuthStateProvider = (CustomAuthStateProvider)AuthStateProvider;
+        await customAuthStateProvider.MarkUserAsLoggedOut();
+
+        Navigation.NavigateTo("/login");
+    }
+}

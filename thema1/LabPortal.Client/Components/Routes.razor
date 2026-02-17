@@ -1,0 +1,28 @@
+﻿@using LabPortal.Client.Components
+@using Microsoft.AspNetCore.Components.Authorization
+
+<CascadingAuthenticationState>
+
+    <Router AppAssembly="typeof(Program).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+                <NotAuthorized>
+                    <div class="alert alert-danger m-4">
+                        <h4>Δεν έχετε δικαίωμα πρόσβασης.</h4>
+                        <p>Παρακαλώ <a href="login">συνδεθείτε</a> για να συνεχίσετε.</p>
+                    </div>
+                </NotAuthorized>
+                <Authorizing>
+                    <div class="p-4">Έλεγχος στοιχείων...</div>
+                </Authorizing>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="typeof(Layout.MainLayout)">
+                <p role="alert">Συγγνώμη, η σελίδα δεν βρέθηκε.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+
+</CascadingAuthenticationState>

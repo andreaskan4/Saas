@@ -1,0 +1,101 @@
+﻿@page "/network"
+@using LabPortal.Client.Models
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject HttpClient Http
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<div class="container mt-4">
+    <h3>Δίκτυο</h3>
+
+    @if (pendingRequests != null && pendingRequests.Count > 0)
+    {
+        <div class="alert alert-warning shadow-sm">
+            <h5>Εκκρεμείς Προσκλήσεις (@pendingRequests.Count)</h5>
+            <ul class="list-group">
+                @foreach (var req in pendingRequests)
+                {
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>
+                            <strong>@req.UserName</strong> θέλει να συνδεθεί μαζί σου.
+                            <br />
+                            <small class="text-muted">@req.RequestDate.ToLocalTime().ToString("g")</small>
+                        </span>
+                        <button class="btn btn-success btn-sm" @onclick="() => AcceptRequest(req.RequesterId)">
+                            Αποδοχή
+                        </button>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
+    else
+    {
+        <p class="text-muted">Δεν έχεις νέα αιτήματα φιλίας.</p>
+    }
+
+    <hr />
+
+    <h4>Εύρεση Χρηστών:</h4>
+    @if (allUsers == null)
+    {
+        <p>Φόρτωση...</p>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var user in allUsers)
+            {
+                <div class="col-md-4 mb-2">
+                    <div class="card p-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>@user.UserName</strong>
+
+                            <button class="btn btn-outline-primary btn-sm" @onclick="() => SendRequest(user.Id)">
+                                Προσθήκη
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<FriendRequestDto>? pendingRequests;
+    private List<UserDto>? allUsers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        var token = await LocalStorage.GetItemAsync<string>("authToken");
+        Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+
+        pendingRequests = await Http.GetFromJsonAsync<List<FriendRequestDto>>("api/friendships/pending");
+
+        allUsers = await Http.GetFromJsonAsync<List<UserDto>>("api/users");
+    }
+
+    private async Task SendRequest(string targetId)
+    {
+        var response = await Http.PostAsync($"api/friendships/request/{targetId}", null);
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine("Request sent!");
+        }
+    }
+
+    private async Task AcceptRequest(string requesterId)
+    {
+        var response = await Http.PostAsync($"api/friendships/accept/{requesterId}", null);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadData();
+        }
+    }
+}

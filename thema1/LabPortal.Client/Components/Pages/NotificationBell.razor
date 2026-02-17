@@ -1,0 +1,146 @@
+﻿@using Microsoft.AspNetCore.SignalR.Client
+@using LabPortal.Client.Models
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject Blazored.LocalStorage.ILocalStorageService LocalStorage
+
+<div class="dropdown">
+    <button class="btn btn-link text-dark position-relative" @onclick="ToggleDropdown">
+        <span class="bi bi-bell-fill" style="font-size: 1.2rem;"></span>
+
+        @if (UnreadCount > 0)
+        {
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                @UnreadCount
+            </span>
+        }
+    </button>
+
+    @if (isOpen)
+    {
+        <div class="dropdown-menu show dropdown-menu-end p-2 shadow" style="min-width: 300px; right: 0; left: auto;">
+            <h6 class="dropdown-header">Ειδοποιήσεις</h6>
+            @if (notifications.Count == 0)
+            {
+                <div class="text-muted text-center p-2">Καμία νέα ειδοποίηση</div>
+            }
+            else
+            {
+                @foreach (var n in notifications)
+                {
+                    <div class="dropdown-item @(n.IsRead ? "" : "bg-light fw-bold")" @onclick="() => HandleClick(n)" style="cursor: pointer; white-space: normal;">
+                        <small class="d-block text-muted">@n.CreatedAt.ToLocalTime().ToString("HH:mm")</small>
+                        <span>@n.Message</span>
+                    </div>
+                }
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<NotificationDto> notifications = new();
+    private bool isOpen = false;
+    private int UnreadCount => notifications.Count(n => !n.IsRead);
+    private HubConnection? hubConnection;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Βάζουμε Try-Catch για να μην κρασάρει το Component αν αποτύχει κάτι
+        try
+        {
+            await LoadNotifications();
+            await StartSignalRListener();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"CRITICAL ERROR in NotificationBell: {ex.Message}");
+        }
+    }
+
+    private async Task LoadNotifications()
+    {
+        try
+        {
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            if (string.IsNullOrEmpty(token)) return;
+
+            Http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            var result = await Http.GetFromJsonAsync<List<NotificationDto>>("api/notifications");
+            if (result != null) notifications = result;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading notifications: {ex.Message}");
+        }
+    }
+
+    private async Task StartSignalRListener()
+    {
+        try
+        {
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            if (string.IsNullOrEmpty(token)) return;
+
+            // Βεβαιώσου ότι το URL είναι σωστό (π.χ. https://localhost:7177/portalHub)
+            hubConnection = new HubConnectionBuilder()
+                .WithUrl("https://localhost:7177/portalHub", opt => opt.AccessTokenProvider = () => Task.FromResult(token))
+                .WithAutomaticReconnect()
+                .Build();
+
+            hubConnection.On<string>("ReceiveNotification", (message) =>
+            {
+                // ΣΗΜΑΝΤΙΚΟ: InvokeAsync για αποφυγή Thread Error
+                InvokeAsync(() =>
+                {
+                    notifications.Insert(0, new NotificationDto
+                    {
+                        Message = message,
+                        CreatedAt = DateTime.UtcNow,
+                        IsRead = false
+                    });
+                    StateHasChanged();
+                });
+            });
+
+            await hubConnection.StartAsync();
+            Console.WriteLine("NotificationBell: SignalR Connected!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SignalR Connection Error: {ex.Message}");
+            // Δεν πετάμε το error ξανά, για να μην κρασάρει το UI
+        }
+    }
+
+    private async Task ToggleDropdown()
+    {
+        isOpen = !isOpen;
+        if (isOpen && UnreadCount > 0)
+        {
+            try
+            {
+                await Http.PostAsync("api/notifications/mark-read", null);
+                notifications.ForEach(n => n.IsRead = true);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error marking read: {ex.Message}");
+            }
+        }
+    }
+
+    private void HandleClick(NotificationDto n)
+    {
+        isOpen = false;
+        if (!string.IsNullOrEmpty(n.Link)) Navigation.NavigateTo(n.Link);
+    }
+
+    public class NotificationDto
+    {
+        public string Message { get; set; } = "";
+        public bool IsRead { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? Link { get; set; }
+    }
+}

@@ -1,0 +1,96 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{908742C6-B70E-455B-87FA-E6B863313BA8}|LabPortal.Client\\LabPortal.Client.csproj|c:\\users\\kandh\\source\\repos\\labportal2\\labportal.client\\components\\pages\\register.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{908742C6-B70E-455B-87FA-E6B863313BA8}|LabPortal.Client\\LabPortal.Client.csproj|solutionrelative:labportal.client\\components\\pages\\register.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{908742C6-B70E-455B-87FA-E6B863313BA8}|LabPortal.Client\\LabPortal.Client.csproj|c:\\users\\kandh\\source\\repos\\labportal2\\labportal.client\\components\\pages\\login.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{908742C6-B70E-455B-87FA-E6B863313BA8}|LabPortal.Client\\LabPortal.Client.csproj|solutionrelative:labportal.client\\components\\pages\\login.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D03A40F2-26AE-9E11-A7ED-5C6AFBAA7805}|LabPortal.API\\LabPortal.API.csproj|c:\\users\\kandh\\source\\repos\\labportal2\\labportal.api\\controllers\\accountcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{D03A40F2-26AE-9E11-A7ED-5C6AFBAA7805}|LabPortal.API\\LabPortal.API.csproj|solutionrelative:labportal.api\\controllers\\accountcontroller.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{908742C6-B70E-455B-87FA-E6B863313BA8}|LabPortal.Client\\LabPortal.Client.csproj|c:\\users\\kandh\\source\\repos\\labportal2\\labportal.client\\components\\app.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}",
+      "RelativeMoniker": "D:0:0:{908742C6-B70E-455B-87FA-E6B863313BA8}|LabPortal.Client\\LabPortal.Client.csproj|solutionrelative:labportal.client\\components\\app.razor||{40D31677-CBC0-4297-A9EF-89D907823A98}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 2,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{3ae79031-e1bc-11d0-8f78-00a0c9110057}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "Register.razor",
+              "DocumentMoniker": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.Client\\Components\\Pages\\Register.razor",
+              "RelativeDocumentMoniker": "LabPortal.Client\\Components\\Pages\\Register.razor",
+              "ToolTip": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.Client\\Components\\Pages\\Register.razor",
+              "RelativeToolTip": "LabPortal.Client\\Components\\Pages\\Register.razor",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAEUAAAA9AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-02-12T23:09:33.292Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Login.razor",
+              "DocumentMoniker": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.Client\\Components\\Pages\\Login.razor",
+              "RelativeDocumentMoniker": "LabPortal.Client\\Components\\Pages\\Login.razor",
+              "ToolTip": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.Client\\Components\\Pages\\Login.razor",
+              "RelativeToolTip": "LabPortal.Client\\Components\\Pages\\Login.razor",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABMAAAAtAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-02-12T23:07:13.091Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "App.razor",
+              "DocumentMoniker": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.Client\\Components\\App.razor",
+              "RelativeDocumentMoniker": "LabPortal.Client\\Components\\App.razor",
+              "ToolTip": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.Client\\Components\\App.razor",
+              "RelativeToolTip": "LabPortal.Client\\Components\\App.razor",
+              "ViewState": "AgIAAAwAAAAAAAAAAAAAABgAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000759|",
+              "WhenOpened": "2026-02-12T23:03:54.678Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "AccountController.cs",
+              "DocumentMoniker": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.API\\Controllers\\AccountController.cs",
+              "RelativeDocumentMoniker": "LabPortal.API\\Controllers\\AccountController.cs",
+              "ToolTip": "C:\\Users\\kandh\\source\\repos\\LabPortal2\\LabPortal.API\\Controllers\\AccountController.cs",
+              "RelativeToolTip": "LabPortal.API\\Controllers\\AccountController.cs",
+              "ViewState": "AgIAAB4AAAAAAAAAAAAowCsAAAB7AAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2026-02-12T22:57:33.168Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

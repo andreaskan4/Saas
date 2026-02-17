@@ -1,0 +1,141 @@
+﻿@using Microsoft.AspNetCore.SignalR.Client
+@using LabPortal.Client.Models
+@using System.Net.Http.Headers
+@using Blazored.LocalStorage
+
+@inject HttpClient Http
+@inject ILocalStorageService LocalStorage
+
+@if (IsVisible)
+{
+    <div class="card shadow" style="position: fixed; bottom: 0; right: 20px; width: 300px; z-index: 1050; border-radius: 10px 10px 0 0;">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center" style="cursor: pointer;" @onclick="ToggleMinimize">
+            <span> @TargetUser?.UserName</span>
+            <div>
+                <button class="btn btn-sm btn-link text-white text-decoration-none" @onclick="Close">✖</button>
+            </div>
+        </div>
+
+        @if (!IsMinimized)
+        {
+            <div class="card-body bg-light" style="height: 250px; overflow-y: auto; padding: 10px;">
+                @if (isLoadingHistory)
+                {
+                    <div class="text-center text-muted">
+                        <small>Φόρτωση ιστορικού...</small>
+                    </div>
+                }
+
+                @foreach (var msg in Messages)
+                {
+                    <div class="@(msg.IsMe ? "text-end" : "text-start") mb-2">
+                        <span class="d-inline-block p-2 rounded @(msg.IsMe ? "bg-primary text-white" : "bg-white border")" style="max-width: 80%;">
+                            @msg.Content
+                        </span>
+                        <div style="font-size: 0.7em; color: gray;">
+                            @msg.SentAt.ToLocalTime().ToString("HH:mm")
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="card-footer p-1">
+                <div class="input-group">
+                    <input @bind="newMessage" @bind:event="oninput" @onkeyup="HandleKeyPress" class="form-control form-control-sm" placeholder="Μήνυμα..." />
+                    <button class="btn btn-sm btn-primary" @onclick="SendMessage">➤</button>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public UserDto? TargetUser { get; set; }
+    [Parameter] public HubConnection? HubConnection { get; set; }
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    private bool IsVisible => TargetUser != null;
+    private bool IsMinimized = false;
+    private bool isLoadingHistory = false;
+    private string newMessage = "";
+
+    private List<MessageDto> Messages = new List<MessageDto>();
+    private string? previousUserId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (TargetUser != null && TargetUser.Id != previousUserId)
+        {
+            Messages.Clear();
+            previousUserId = TargetUser.Id;
+            await LoadHistory();
+        }
+    }
+
+    private async Task LoadHistory()
+    {
+        if (TargetUser == null) return;
+
+        isLoadingHistory = true;
+        try
+        {
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            if (!string.IsNullOrEmpty(token))
+            {
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+                var history = await Http.GetFromJsonAsync<List<MessageDto>>($"api/messages/{TargetUser.Id}");
+
+                if (history != null)
+                {
+                    Messages = history;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading history: {ex.Message}");
+        }
+        finally
+        {
+            isLoadingHistory = false;
+        }
+    }
+
+    private void ToggleMinimize() => IsMinimized = !IsMinimized;
+
+    private async Task Close()
+    {
+        TargetUser = null;
+        previousUserId = null;
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task HandleKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SendMessage();
+    }
+
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(newMessage) || HubConnection is null || TargetUser is null) return;
+
+        await HubConnection.SendAsync("SendPrivateMessage", TargetUser.Id, newMessage);
+
+        Messages.Add(new MessageDto { Content = newMessage, IsMe = true, SentAt = DateTime.UtcNow });
+        newMessage = "";
+    }
+
+    public void ReceiveMessage(string message)
+    {
+        Messages.Add(new MessageDto { Content = message, IsMe = false, SentAt = DateTime.UtcNow });
+        StateHasChanged();
+    }
+
+    public class MessageDto
+    {
+        public string Content { get; set; } = "";
+        public bool IsMe { get; set; }
+        public DateTime SentAt { get; set; }
+    }
+}

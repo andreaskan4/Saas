@@ -1,0 +1,192 @@
+﻿@page "/feed"
+@using Microsoft.AspNetCore.Authorization
+@using LabPortal.Client.Models
+@attribute [Authorize]
+@inject HttpClient Http
+@using System.Net.Http.Headers
+@using Blazored.LocalStorage
+@inject ILocalStorageService LocalStorage
+
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>Ανακοινώσεις</h3>
+        <button class="btn btn-primary" @onclick="ToggleCreateForm">
+            @(showCreateForm ? "Ακύρωση" : "Νέο Post")
+        </button>
+    </div>
+
+    @if (showCreateForm)
+    {
+        <div class="card p-4 mb-4 shadow-sm bg-light border-primary">
+            <h5>Νέας Δημοσίευση</h5>
+            <div class="mb-2">
+                <input @bind="newPost.Title" class="form-control mb-2" placeholder="Τίτλος..." />
+
+                <textarea @bind="newPost.Content" class="form-control mb-2" placeholder="Γράψε το μήνυμά σου..." rows="3"></textarea>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <select @bind="newPost.Category" class="form-select mb-2">
+                            <option value="">-- Επιλογή Κατηγορίας --</option>
+                            <option value="General">Γενικά</option>
+                            <option value="Lab">Εργαστήριο</option>
+                            <option value="Exams">Εξεταστική</option>
+                            <option value="Research">Έρευνα</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <input @bind="newPost.Tags" class="form-control mb-2" placeholder="Tags (π.χ. #csharp, #help)" />
+                    </div>
+                </div>
+
+                <button class="btn btn-success w-100 mt-2" @onclick="CreatePost">Δημοσίευση</button>
+            </div>
+        </div>
+    }
+
+    <div class="row g-2 mb-4">
+        <div class="col-md-6">
+            <div class="input-group">
+                <span class="input-group-text">🔍</span>
+                <input @bind="searchTerm" @bind:event="oninput" @onkeyup="HandleSearch" class="form-control" placeholder="Αναζήτηση..." />
+            </div>
+        </div>
+        <div class="col-md-4">
+            <select @bind="selectedCategory" class="form-select" @onclick="LoadPosts">
+                <option value="">Όλες οι κατηγορίες</option>
+                <option value="General">Γενικά</option>
+                <option value="Lab">Εργαστήριο</option>
+                <option value="Exams">Εξεταστική</option>
+                <option value="Research">Έρευνα</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-outline-secondary w-100" @onclick="LoadPosts">Refresh</button>
+        </div>
+    </div>
+
+    @if (posts == null)
+    {
+        <div class="text-center mt-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p>Φόρτωση δημοσιεύσεων...</p>
+        </div>
+    }
+    else if (posts.Count == 0)
+    {
+        <div class="alert alert-info text-center">
+            Δεν βρέθηκαν δημοσιεύσεις με αυτά τα κριτήρια.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var post in posts)
+            {
+                <div class="col-12 mb-3">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between">
+                                <h5 class="card-title text-primary fw-bold">@post.Title</h5>
+                                <span class="badge bg-secondary align-self-start">@post.Category</span>
+                            </div>
+
+                            <h6 class="card-subtitle mb-3 text-muted" style="font-size: 0.85rem;">
+                                👤 <strong>@(post.User?.UserName ?? "Άγνωστος")</strong>
+                                • 📅 @post.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")
+                            </h6>
+
+                            <p class="card-text" style="white-space: pre-wrap;">@post.Content</p>
+
+                            @if (!string.IsNullOrEmpty(post.Tags))
+                            {
+                                <div class="mt-2">
+                                    <small class="text-muted">Tags: <span class="text-info">@post.Tags</span></small>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<Post>? posts;
+    private Post newPost = new Post();
+    private bool showCreateForm = false;
+    private string searchTerm = "";
+    private string selectedCategory = "";
+
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPosts();
+    }
+
+    private async Task LoadPosts()
+    {
+        try
+        {
+            errorMessage = null;
+
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+
+            if (string.IsNullOrEmpty(token))
+            {
+                errorMessage = "Δεν βρέθηκε token. Παρακαλώ συνδεθείτε ξανά.";
+                posts = new List<Post>();
+                return;
+            }
+
+            Http.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", token);
+
+            var url = $"api/posts?category={selectedCategory}&search={searchTerm}";
+            posts = await Http.GetFromJsonAsync<List<Post>>(url);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading posts: {ex.Message}");
+            errorMessage = $"Σφάλμα φόρτωσης: {ex.Message}";
+            posts = new List<Post>();
+        }
+    }
+
+    private async Task HandleSearch(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await LoadPosts();
+    }
+
+    private void ToggleCreateForm() => showCreateForm = !showCreateForm;
+
+    private async Task CreatePost()
+    {
+        if (string.IsNullOrWhiteSpace(newPost.Title) || string.IsNullOrWhiteSpace(newPost.Content)) return;
+
+        try
+        {
+            var token = await LocalStorage.GetItemAsync<string>("authToken");
+            Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+            var response = await Http.PostAsJsonAsync("api/posts", newPost);
+
+            if (response.IsSuccessStatusCode)
+            {
+                newPost = new Post();
+                showCreateForm = false;
+                await LoadPosts();
+            }
+            else
+            {
+                errorMessage = "Απέτυχε η δημοσίευση.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Σφάλμα: " + ex.Message;
+        }
+    }
+}
